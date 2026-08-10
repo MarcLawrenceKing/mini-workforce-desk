@@ -1,0 +1,67 @@
+@import "tailwindcss";
+@import "tailwindcss-primeui";
+
+/* Bind Tailwind's dark: variant to the .dark class instead of the OS setting,
+   so it follows the same toggle PrimeVue's darkModeSelector uses. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+    --app-gutter: 1rem;
+    --app-max: 80rem;
+}
+
+body {
+    background-color: var(--p-surface-0);
+    color: var(--p-text-color);
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease;
+}
+.dark body {
+    background-color: var(--p-surface-950);
+}
+
+.app-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border-block-end: 1px solid var(--p-surface-200);
+    background-color: color-mix(in srgb, var(--p-surface-0) 80%, transparent);
+    backdrop-filter: blur(8px);
+}
+.dark .app-header {
+    border-block-end-color: var(--p-surface-800);
+    background-color: color-mix(in srgb, var(--p-surface-950) 80%, transparent);
+}
+
+.app-muted {
+    color: var(--p-text-muted-color);
+}
+
+.app-shell {
+    max-width: var(--app-max);
+    margin-inline: auto;
+    padding: var(--app-gutter);
+}
+.stack > * + * {
+    margin-block-start: 1rem;
+}
+.grid-cards {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+    .grid-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (min-width: 1024px) {
+    :root {
+        --app-gutter: 2rem;
+    }
+    .grid-cards {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
