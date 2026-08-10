@@ -11,15 +11,18 @@ Host: Windows 11 Pro (10.0.26200), PowerShell 5.1.
 | Tool         | Version                         | Where it runs             |
 | ------------ | ------------------------------- | ------------------------- |
 | PHP          | 8.5.0 (cli, NTS, VC++ 2022 x64) | Windows                   |
-| Composer     | 2.10.2                          | Windows                   |
+| Composer     | 2.8.12 (pinned — see below)     | Windows                   |
 | Node.js      | v24.18.1                        | Windows                   |
 | npm          | 11.16.0                         | Windows                   |
 | MySQL        | 8.0.46 (Community Server - GPL) | Windows service `MySQL80` |
 | Redis        | 7.0.15                          | WSL2 — Ubuntu 24.04.1 LTS |
 | WSL          | 2.7.11.0 (kernel 6.18.33.2-2)   | Windows                   |
-| Laravel      | ^13.8                           | — (composer constraint)   |
-| Vite         | ^8.0.0                          | — (npm constraint)        |
-| Tailwind CSS | ^4.0.0                          | — (npm constraint)        |
+| Laravel      | 13.24.0                         | —                         |
+| Vite         | 8.2.1                           | —                         |
+| Tailwind CSS | 4.3.3                           | —                         |
+
+> Composer is deliberately held at **2.8.12**, not the current 2.10.2. Installing anything with
+> 2.10.x fails on this machine — see [Composer 2.10 on Herd Lite PHP](#composer-210-cannot-install-on-herd-lite-php).
 
 Required PHP extensions present: `redis` (phpredis), `pdo_mysql`, `mysqli`.
 
@@ -51,7 +54,7 @@ composer --version
 ```
 
 ```
-Composer version 2.10.2 2026-07-01 11:24:45
+Composer version 2.8.12 2025-09-19 13:41:59
 PHP version 8.5.0 (C:\Users\Sixpent PC\.config\herd-lite\bin\php.exe)
 ```
 
@@ -127,8 +130,8 @@ redis
 
 ### End-to-end: Laravel talking to both services
 
-The strongest proof — the framework itself reaching MySQL and Redis. Requires
-`composer install` to have been run first:
+The strongest proof — the framework itself reaching MySQL and Redis. Requires `composer install`
+to have been run first:
 
 ```powershell
 php artisan tinker --execute="Illuminate\Support\Facades\Redis::set('probe','ok'); echo 'REDIS='.Illuminate\Support\Facades\Redis::get('probe').PHP_EOL; echo 'MYSQL='.Illuminate\Support\Facades\DB::selectOne('select version() v')->v.PHP_EOL;"
@@ -147,11 +150,7 @@ The Laravel skeleton ships with `DB_CONNECTION=sqlite`. This project uses MySQL 
 8.0.46 runs as the Windows service `MySQL80` and listens on `127.0.0.1:3306`. The app connects
 as `root` over TCP.
 
-Create the schema once:
-
-```powershell
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS mini_workforce_desk CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-```
+````
 
 ### `.env` configuration
 
@@ -164,7 +163,7 @@ DB_PORT=3306
 DB_DATABASE=mini_workforce_desk
 DB_USERNAME=root
 DB_PASSWORD=<your local MySQL root password>
-```
+````
 
 ### Running migrations
 
@@ -222,14 +221,7 @@ composer install
 npm install
 Copy-Item .env.example .env
 php artisan key:generate
-# edit .env for MySQL (see Database setup), then:
 php artisan migrate
 npm run dev      # Vite dev server
 php artisan serve
 ```
-
-`composer.json` also defines shortcuts for this:
-
-- `composer setup` — install, `.env`, key, migrate, `npm install`, `npm run build`
-- `composer dev` — runs `php artisan serve`, `queue:listen`, `pail`, and `npm run dev` together
-- `composer test` — clears config, then `php artisan test`
