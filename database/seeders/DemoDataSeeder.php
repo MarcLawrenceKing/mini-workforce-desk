@@ -11,8 +11,14 @@ class DemoDataSeeder extends Seeder
 {
     public function run(): void
     {
-        $companyOne = Company::updateOrCreate(['name' => 'Company One'], ['is_active' => true]);
-        $companyTwo = Company::updateOrCreate(['name' => 'Company Two'], ['is_active' => true]);
+        $companyOne = Company::updateOrCreate(
+            ['name' => 'Company One'],
+            ['is_active' => true, 'rate_per_hr' => 100.00],
+        );
+        $companyTwo = Company::updateOrCreate(
+            ['name' => 'Company Two'],
+            ['is_active' => true, 'rate_per_hr' => 150.00],
+        );
 
         // Only ever one admin. If you registered one through /register this is skipped,
         // so the seeder can't quietly create a second and defeat the bootstrap rule.

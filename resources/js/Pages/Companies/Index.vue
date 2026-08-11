@@ -46,6 +46,10 @@ const fields = computed(() => [
     },
 ]);
 
+function formatHourlyRate(rate) {
+    return Number(rate ?? 0).toFixed(2);
+}
+
 function confirmDelete(company) {
     confirm.require({
         header: "Delete company",
@@ -117,6 +121,11 @@ function confirmDelete(company) {
                     </template>
 
                     <Column field="name" header="Name" sortable />
+                    <Column field="rate_per_hr" header="Rate per hour" sortable>
+                        <template #body="{ data }">
+                            {{ formatHourlyRate(data.rate_per_hr) }}
+                        </template>
+                    </Column>
                     <Column field="users_count" header="Users" sortable />
                     <Column field="employees_count" header="Employees" sortable />
                     <Column field="is_active" header="Status" sortable>
