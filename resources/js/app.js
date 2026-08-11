@@ -3,14 +3,10 @@ import { createApp, h } from "vue";
 import { createInertiaApp } from "@inertiajs/vue3";
 import { resolvePageComponent } from "laravel-vite-plugin/inertia-helpers";
 import AppLayout from "./Layouts/AppLayout.vue";
+import AuthLayout from "./Layouts/AuthLayout.vue";
 import PrimeVue from "primevue/config";
 import Aura from "@primeuix/themes/aura";
 import "primeicons/primeicons.css";
-import Button from "primevue/button";
-import Card from "primevue/card";
-import DataTable from "primevue/datatable";
-import Column from "primevue/column";
-import Tag from "primevue/tag";
 
 createInertiaApp({
     title: (title) => `${title} — Mini Workforce Desk`,
@@ -20,8 +16,10 @@ createInertiaApp({
             import.meta.glob("./Pages/**/*.vue"),
         );
 
-        // Every page gets the shared header unless it declares its own layout.
-        page.default.layout ??= AppLayout;
+        // Auth screens get a bare centred layout; everything else gets the app chrome.
+        page.default.layout ??= name.startsWith("Auth/")
+            ? AuthLayout
+            : AppLayout;
 
         return page;
     },

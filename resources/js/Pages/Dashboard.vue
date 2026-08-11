@@ -11,9 +11,9 @@ defineProps({ staff: { type: Array, default: () => [] } });
 
 <template>
     <Head title="Dashboard" />
-    <div class="app-shell stack py-8">
-        <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-semibold">Workforce</h1>
+    <div class="page">
+        <div class="page-header">
+            <h1 class="page-title">Workforce</h1>
             <Button label="Add staff" icon="pi pi-plus" />
         </div>
 

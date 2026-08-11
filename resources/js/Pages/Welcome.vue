@@ -11,7 +11,7 @@ defineProps({
 <template>
     <Head :title="title" />
 
-    <main class="app-shell stack py-16">
+    <main class="page py-16">
         <p class="app-muted text-xs font-semibold tracking-widest uppercase">
             Laravel · Inertia · Vue
         </p>

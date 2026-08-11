@@ -6,9 +6,10 @@ import FlashMessages from "../Components/FlashMessages.vue";
 <template>
     <AppHeader />
 
-    <div class="app-shell pt-4">
-        <FlashMessages />
-    </div>
-
-    <slot />
+    <main class="auth-shell">
+        <div class="auth-card stack">
+            <FlashMessages />
+            <slot />
+        </div>
+    </main>
 </template>

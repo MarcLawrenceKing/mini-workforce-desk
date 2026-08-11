@@ -25,10 +25,13 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
+            'company_id' => null,
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
+            'username' => fake()->unique()->userName(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'is_disabled' => false,
             'remember_token' => Str::random(10),
         ];
     }
@@ -40,6 +43,16 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * Indicate that the account has been disabled.
+     */
+    public function disabled(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_disabled' => true,
         ]);
     }
 }
