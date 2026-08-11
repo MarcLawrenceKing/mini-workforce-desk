@@ -60,6 +60,16 @@ class CompanyController extends Controller
     {
         $this->authorize('delete', $company);
 
+        // users.company_id and employees.company_id are RESTRICT foreign keys,
+        // so a non-empty company would fail at the database instead of here.
+        // (Employees count even when soft-deleted — the row is still there.)
+        if ($company->users()->exists() || $company->employees()->withTrashed()->exists()) {
+            return back()->with(
+                'error',
+                'That company still has users or employees. Move or remove them first.',
+            );
+        }
+
         $company->delete();
 
         return back()->with('success', 'Company deleted.');

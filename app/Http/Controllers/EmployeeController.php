@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Company;
 use App\Models\Employee;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,15 +17,43 @@ class EmployeeController extends Controller
     {
         $viewer = $request->user();
 
+        // Soft-deleted rows stay out of the list until the toggle asks for them.
+        $withTrashed = $request->boolean('trashed');
+
         return Inertia::render('Employees/Index', [
             'employees' => Employee::query()
                 ->visibleTo($viewer)
-                ->with(['company:id,name', 'user:id,email'])
+                ->when($withTrashed, fn ($query) => $query->withTrashed())
+                ->with(['company:id,name', 'user:id,name,email'])
                 ->orderBy('last_name')
-                ->get(),
+                ->get()
+                ->map(fn (Employee $employee) => [
+                    ...$employee->only([
+                        'id', 'employee_no', 'full_name', 'company_id', 'user_id',
+                        'first_name', 'middle_name', 'last_name',
+                    ]),
+                    'company' => $employee->company?->only(['id', 'name']),
+                    'user' => $employee->user?->only(['id', 'name', 'email']),
+                    'deleted_at' => $employee->deleted_at?->toDateTimeString(),
+                ]),
+            'trashed' => $withTrashed,
+
+            // An admin has no company_id of its own, so it picks the target company.
+            'companies' => Company::visibleTo($viewer)->orderBy('name')->get(['id', 'name']),
+
+            // Only accounts that aren't already tied to an employee record are
+            // offered; the row's own account is merged back in by the dialog.
+            'linkableUsers' => User::query()
+                ->visibleTo($viewer)
+                ->whereDoesntHave('employee')
+                ->orderBy('name')
+                ->get(['id', 'name', 'email', 'company_id']),
+
             'can' => [
                 'create' => $viewer->isAbleTo('employees.create'),
                 'edit' => $viewer->isAbleTo('employees.edit'),
+                'delete' => $viewer->isAbleTo('employees.delete'),
+                'assignAnyCompany' => $viewer->hasRole('admin'),
             ],
         ]);
     }
@@ -31,11 +61,20 @@ class EmployeeController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $viewer = $request->user();
+        $isAdmin = $viewer->hasRole('admin');
+
+        // A company_admin can only ever create inside its own company; the value
+        // an admin picked is validated below before it reaches the query.
+        $companyId = $isAdmin ? $request->integer('company_id') : $viewer->company_id;
 
         $validated = $request->validate([
+            // Required for an admin, who has no company of its own to fall back on.
+            'company_id' => [Rule::requiredIf($isAdmin), 'nullable', 'integer', 'exists:companies,id'],
             'employee_no' => [
                 'required', 'string', 'max:255',
-                Rule::unique('employees', 'employee_no')->where('company_id', $viewer->company_id),
+                // Not ->withoutTrashed(): the unique index spans soft-deleted rows,
+                // so a reused number has to fail here rather than at the database.
+                Rule::unique('employees', 'employee_no')->where('company_id', $companyId),
             ],
             'first_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['required', 'string', 'max:255'],   // NOT NULL in the migration
@@ -45,7 +84,7 @@ class EmployeeController extends Controller
 
         Employee::create([
             ...$validated,
-            'company_id' => $viewer->company_id,
+            'company_id' => $companyId,
         ]);
 
         return back()->with('success', 'Employee created.');
@@ -53,14 +92,9 @@ class EmployeeController extends Controller
 
     public function update(Request $request, Employee $employee): RedirectResponse
     {
-        $viewer = $request->user();
+        $this->assertInScope($request, $employee);
 
-        abort_unless(
-            $viewer->hasRole('admin') || $viewer->company_id === $employee->company_id,
-            403,
-        );
-
-        $employee->update($request->validate([
+        $validated = $request->validate([
             'employee_no' => [
                 'required', 'string', 'max:255',
                 Rule::unique('employees', 'employee_no')
@@ -70,8 +104,44 @@ class EmployeeController extends Controller
             'first_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
-        ]));
+            'user_id' => [
+                'nullable', 'integer', 'exists:users,id',
+                Rule::unique('employees', 'user_id')->ignore($employee->id),
+            ],
+        ]);
+
+        $employee->update($validated);
 
         return back()->with('success', 'Employee updated.');
+    }
+
+    /** Soft delete — the row keeps its employee_no reservation and can be restored. */
+    public function destroy(Request $request, Employee $employee): RedirectResponse
+    {
+        $this->assertInScope($request, $employee);
+
+        $employee->delete();
+
+        return back()->with('success', 'Employee deleted.');
+    }
+
+    public function restore(Request $request, Employee $employee): RedirectResponse
+    {
+        $this->assertInScope($request, $employee);
+
+        $employee->restore();
+
+        return back()->with('success', 'Employee restored.');
+    }
+
+    /** 403 when a company_admin targets an employee outside its own company. */
+    private function assertInScope(Request $request, Employee $employee): void
+    {
+        $viewer = $request->user();
+
+        abort_unless(
+            $viewer->hasRole('admin') || $viewer->company_id === $employee->company_id,
+            403,
+        );
     }
 }

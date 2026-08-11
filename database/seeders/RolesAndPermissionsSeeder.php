@@ -24,6 +24,8 @@ class RolesAndPermissionsSeeder extends Seeder
         'employees.view' => 'View employees',
         'employees.create' => 'Create employees',
         'employees.edit' => 'Edit employees',
+        // Covers the soft delete and the restore that undoes it.
+        'employees.delete' => 'Delete employees',
 
         'attendance-logs.view' => 'View attendance logs',
         'requests.view' => 'View requests',
@@ -38,7 +40,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'permissions' => [
                 'users.view', 'users.create', 'users.edit',
                 'companies.view', 'companies.create', 'companies.edit',
-                'employees.view', 'employees.create', 'employees.edit',
+                'employees.view', 'employees.create', 'employees.edit', 'employees.delete',
             ],
         ],
         'company_admin' => [
@@ -47,7 +49,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'permissions' => [
                 'users.view', 'users.create', 'users.edit',
                 'companies.view', 'companies.edit',
-                'employees.view', 'employees.create', 'employees.edit',
+                'employees.view', 'employees.create', 'employees.edit', 'employees.delete',
                 'requests.view',
             ],
         ],

@@ -9,6 +9,9 @@
     --app-gutter: 1rem;
     --app-max: 80rem;
     --app-stack: 1rem;
+    /* Fixed so the sticky sidebar knows exactly where the topbar ends. */
+    --app-header-h: 3.75rem;
+    --app-sidebar-w: 15rem;
 }
 
 @media (min-width: 1024px) {
@@ -33,18 +36,62 @@ body {
 @layer components {
     /* ---- layout ------------------------------------------------------- */
 
-    /* Centred column with page gutters. `app-shell` carries no vertical
-       padding — the header and other chrome set their own. */
-    .app-shell,
+    /* Centred column with page gutters. `.page` is what every screen wraps
+       itself in; inside the shell it centres in whatever the sidebar leaves. */
     .page {
         max-width: var(--app-max);
         margin-inline: auto;
         padding-inline: var(--app-gutter);
+        padding-block: 2rem;
     }
 
-    /* The standard page body: shell + vertical rhythm + breathing room. */
-    .page {
-        padding-block: 2rem;
+    /* ---- app shell ----------------------------------------------------- */
+
+    .app-body {
+        display: flex;
+        align-items: flex-start;
+    }
+
+    .app-main {
+        flex: 1 1 auto;
+        /* Without this a wide DataTable stretches the flex item instead of
+           scrolling inside it. */
+        min-width: 0;
+    }
+
+    .app-flash {
+        max-width: var(--app-max);
+        margin-inline: auto;
+        padding-inline: var(--app-gutter);
+    }
+    .app-flash:not(:empty) {
+        padding-block-start: 1rem;
+    }
+
+    /* ---- sidebar ------------------------------------------------------- */
+
+    /* Below md the same nav is rendered inside the drawer instead. */
+    .app-sidebar {
+        display: none;
+        position: sticky;
+        top: var(--app-header-h);
+        flex: 0 0 var(--app-sidebar-w);
+        width: var(--app-sidebar-w);
+        height: calc(100vh - var(--app-header-h));
+        overflow-y: auto;
+        padding: 1rem 0.75rem;
+        border-inline-end: 1px solid var(--p-surface-200);
+    }
+    .dark .app-sidebar {
+        border-inline-end-color: var(--p-surface-800);
+    }
+
+    /* Kept in sync with the query in useIsMobile, which hides the hamburger and
+       the drawer at the same point. */
+    @media (min-width: 768px) {
+        .app-sidebar {
+            display: block;
+        }
     }
 
     .stack > * + *,
@@ -79,22 +126,55 @@ body {
 
     .app-header-bar {
         display: flex;
+        height: var(--app-header-h);
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
-        padding-block: 0.75rem;
+        padding-inline: var(--app-gutter);
     }
 
+    /* ---- navigation ----------------------------------------------------- */
+
+    /* Vertical list — rendered in the sidebar on desktop, the drawer on mobile. */
     .app-nav {
-        display: none;
-        align-items: center;
-        gap: 0.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
     }
 
-    @media (min-width: 768px) {
-        .app-nav {
-            display: flex;
-        }
+    .app-nav-item {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        padding: 0.55rem 0.75rem;
+        border-radius: var(--p-border-radius-md, 0.375rem);
+        color: var(--p-text-muted-color);
+        font-size: 0.9rem;
+        font-weight: 500;
+        text-decoration: none;
+        transition:
+            background-color 0.15s ease,
+            color 0.15s ease;
+    }
+
+    .app-nav-item:hover {
+        background-color: var(--p-surface-100);
+        color: var(--p-text-color);
+    }
+    .dark .app-nav-item:hover {
+        background-color: var(--p-surface-800);
+    }
+
+    .app-nav-item.is-active {
+        background-color: var(--p-primary-50);
+        color: var(--p-primary-color);
+    }
+    .dark .app-nav-item.is-active {
+        background-color: color-mix(
+            in srgb,
+            var(--p-primary-color) 18%,
+            transparent
+        );
     }
 
     /* ---- page furniture ----------------------------------------------- */
@@ -156,6 +236,35 @@ body {
     .row-actions {
         display: flex;
         gap: 0.25rem;
+    }
+
+    /* Search box + list-level switches, sitting in the DataTable #header slot. */
+    .table-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+    }
+
+    .table-toolbar-search {
+        width: 100%;
+    }
+
+    @media (min-width: 640px) {
+        .table-toolbar-search {
+            width: 18rem;
+        }
+    }
+
+    /* A soft-deleted row stays readable but visibly inactive. */
+    .row-deleted {
+        opacity: 0.55;
+    }
+
+    .entity-dialog {
+        width: 100%;
+        max-width: 34rem;
     }
 
     .tag-list {

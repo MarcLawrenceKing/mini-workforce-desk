@@ -102,6 +102,16 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::middleware('permission:employees.edit')->group(function () {
             Route::put('/{employee}', [EmployeeController::class, 'update'])->name('update');
         });
+
+        // Soft delete, and the restore that undoes it. `withTrashed` on the
+        // binding is what lets a deleted row still resolve for the restore.
+        Route::middleware('permission:employees.delete')->group(function () {
+            Route::delete('/{employee}', [EmployeeController::class, 'destroy'])->name('destroy');
+
+            Route::put('/{employee}/restore', [EmployeeController::class, 'restore'])
+                ->withTrashed()
+                ->name('restore');
+        });
     });
 
     // --- Placeholders ----------------------------------------------------

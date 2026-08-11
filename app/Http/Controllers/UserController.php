@@ -40,6 +40,11 @@ class UserController extends Controller
                     'is_disabled' => $user->is_disabled,
                     'company' => $user->company?->only(['id', 'name']),
                     'roles' => $user->roles->pluck('display_name')->values(),
+                    // Machine name for the edit form; `roles` above is for display.
+                    'role' => $user->roles->pluck('name')->first(),
+                    // The edit dialog is hidden for the administrator — syncRoles()
+                    // there would strip the only admin role and lock everyone out.
+                    'is_admin' => $user->hasRole('admin'),
                 ]),
             'companies' => Company::visibleTo($viewer)->orderBy('name')->get(['id', 'name']),
             'assignableRoles' => self::ASSIGNABLE_ROLES,
