@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AttendanceLogController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\CompanyController;
@@ -114,11 +115,22 @@ Route::middleware(['auth', 'active'])->group(function () {
         });
     });
 
+    // --- Attendance logs -------------------------------------------------
+    Route::prefix('attendance-logs')->name('attendance-logs.')
+        ->middleware('permission:attendance-logs.view')->group(function () {
+            Route::get('/', [AttendanceLogController::class, 'index'])->name('index');
+            Route::post('/', [AttendanceLogController::class, 'store'])->name('store');
+            Route::post('/check-in', [AttendanceLogController::class, 'checkIn'])->name('check-in');
+            Route::put('/check-out', [AttendanceLogController::class, 'checkOut'])->name('check-out');
+            Route::put('/{attendanceLog}', [AttendanceLogController::class, 'update'])
+                ->whereNumber('attendanceLog')
+                ->name('update');
+            Route::put('/{attendanceLog}/approve', [AttendanceLogController::class, 'approve'])
+                ->whereNumber('attendanceLog')
+                ->name('approve');
+        });
+
     // --- Placeholders ----------------------------------------------------
-    Route::get('/attendance-logs', fn() => Inertia::render('UnderConstruction', [
-        'title' => 'Attendance Logs',
-        'blurb' => 'Daily time-in / time-out records land here in a later task.',
-    ]))->middleware('permission:attendance-logs.view')->name('attendance-logs.index');
 
     Route::get('/requests', fn() => Inertia::render('UnderConstruction', [
         'title' => 'Requests',

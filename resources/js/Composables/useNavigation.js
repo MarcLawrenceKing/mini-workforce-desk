@@ -16,8 +16,8 @@ const LINKS = {
 };
 
 const NAV_BY_ROLE = {
-    admin: ["myAccount", "users", "companies", "employees"],
-    company_admin: ["myAccount", "users", "companies", "employees", "requests"],
+    admin: ["myAccount", "users", "companies", "employees", "attendanceLogs"],
+    company_admin: ["myAccount", "users", "companies", "employees", "attendanceLogs", "requests"],
     employee: ["myAccount", "attendanceLogs", "requests"],
 };
 

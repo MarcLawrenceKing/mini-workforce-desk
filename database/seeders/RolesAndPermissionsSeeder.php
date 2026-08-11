@@ -41,6 +41,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'users.view', 'users.create', 'users.edit',
                 'companies.view', 'companies.create', 'companies.edit',
                 'employees.view', 'employees.create', 'employees.edit', 'employees.delete',
+                'attendance-logs.view',
             ],
         ],
         'company_admin' => [
@@ -50,6 +51,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'users.view', 'users.create', 'users.edit',
                 'companies.view', 'companies.edit',
                 'employees.view', 'employees.create', 'employees.edit', 'employees.delete',
+                'attendance-logs.view',
                 'requests.view',
             ],
         ],

@@ -298,6 +298,48 @@ body {
         text-align: center;
     }
 
+    .attendance-summary {
+        display: grid;
+        gap: 1rem;
+    }
+
+    @media (min-width: 640px) {
+        .attendance-summary {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    .summary-value {
+        font-size: 1.5rem;
+    }
+
+    .month-picker,
+    .check-row,
+    .attendance-filters {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .month-picker {
+        justify-content: center;
+    }
+
+    .check-row {
+        justify-content: space-between;
+        padding: 1rem;
+        border: 1px solid var(--p-surface-200);
+        border-radius: var(--p-border-radius-md);
+    }
+
+    .dark .check-row {
+        border-color: var(--p-surface-700);
+    }
+
+    .attendance-filters {
+        flex-wrap: wrap;
+    }
+
     /* ---- auth ---------------------------------------------------------- */
 
     .auth-shell {
