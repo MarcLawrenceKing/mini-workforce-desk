@@ -18,7 +18,7 @@ class AttendanceLogController extends Controller
     public function index(Request $request): Response
     {
         $viewer = $request->user();
-        $isManager = $viewer->hasRole(['admin', 'company_admin']);
+        $isManager = $viewer->hasRole('company_admin');
         $month = $this->month($request->string('month')->toString());
 
         if ($isManager) {
@@ -212,7 +212,7 @@ class AttendanceLogController extends Controller
 
     private function assertManager(Request $request): void
     {
-        abort_unless($request->user()->hasRole(['admin', 'company_admin']), 403);
+        abort_unless($request->user()->hasRole('company_admin'), 403);
     }
 
     private function ownEmployee(Request $request): Employee

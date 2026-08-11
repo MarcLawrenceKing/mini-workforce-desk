@@ -134,4 +134,21 @@ class AttendanceLogTest extends TestCase
             'status' => 'approved',
         ])->assertForbidden();
     }
+
+    public function test_admin_cannot_access_attendance_logs(): void
+    {
+        $admin = $this->user('admin', $this->own);
+
+        $this->actingAs($admin)->get('/attendance-logs')->assertForbidden();
+    }
+
+    public function test_company_admin_and_employee_can_access_attendance_logs(): void
+    {
+        $companyAdmin = $this->user('company_admin', $this->own);
+        $employee = $this->user('employee', $this->own);
+        $this->employee($this->own, $employee);
+
+        $this->actingAs($companyAdmin)->get('/attendance-logs')->assertOk();
+        $this->actingAs($employee)->get('/attendance-logs')->assertOk();
+    }
 }

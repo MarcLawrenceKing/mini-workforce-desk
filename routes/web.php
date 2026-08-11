@@ -117,7 +117,7 @@ Route::middleware(['auth', 'active'])->group(function () {
 
     // --- Attendance logs -------------------------------------------------
     Route::prefix('attendance-logs')->name('attendance-logs.')
-        ->middleware('permission:attendance-logs.view')->group(function () {
+        ->middleware(['role:company_admin|employee', 'permission:attendance-logs.view'])->group(function () {
             Route::get('/', [AttendanceLogController::class, 'index'])->name('index');
             Route::post('/', [AttendanceLogController::class, 'store'])->name('store');
             Route::post('/check-in', [AttendanceLogController::class, 'checkIn'])->name('check-in');
