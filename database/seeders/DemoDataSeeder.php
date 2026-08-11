@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\AttendanceLog;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\User;
@@ -40,7 +41,7 @@ class DemoDataSeeder extends Seeder
             'employee',
         );
 
-        Employee::updateOrCreate(
+        $companyOneEmployee = Employee::updateOrCreate(
             ['user_id' => $employeeUser->id],
             [
                 'company_id' => $companyOne->id,
@@ -63,6 +64,60 @@ class DemoDataSeeder extends Seeder
 
         // A second company so "company_admin cannot manage other companies" is testable.
         $this->makeUser('admin@company2.com', 'company2admin', 'Company Two Admin', $companyTwo, 'company_admin');
+
+        $companyTwoEmployeeUser = $this->makeUser(
+            'employee@company2.com',
+            'company2employee',
+            'Company Two Employee',
+            $companyTwo,
+            'employee',
+        );
+
+        $companyTwoEmployee = Employee::updateOrCreate(
+            [
+                'company_id' => $companyTwo->id,
+                'employee_no' => 'C2-0001',
+            ],
+            [
+                'user_id' => $companyTwoEmployeeUser->id,
+                'first_name' => 'Grace',
+                'middle_name' => 'B',
+                'last_name' => 'Hopper',
+            ],
+        );
+
+        $this->seedAttendanceLogs($companyOneEmployee);
+        $this->seedAttendanceLogs($companyTwoEmployee);
+    }
+
+    private function seedAttendanceLogs(Employee $employee): void
+    {
+        $logs = [
+            [
+                'date' => '2026-08-10',
+                'log_in_time' => '08:00:00',
+                'log_out_time' => '17:00:00',
+                'notes' => 'Regular work day',
+                'status' => 'approved',
+            ],
+            [
+                'date' => '2026-08-11',
+                'log_in_time' => '08:30:00',
+                'log_out_time' => '17:30:00',
+                'notes' => 'Regular work day',
+                'status' => 'pending',
+            ],
+        ];
+
+        foreach ($logs as $log) {
+            AttendanceLog::updateOrCreate(
+                [
+                    'employee_id' => $employee->id,
+                    'date' => $log['date'],
+                ],
+                $log,
+            );
+        }
     }
 
     private function makeUser(
