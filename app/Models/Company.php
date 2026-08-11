@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'is_active'])]
+#[Fillable(['name', 'is_active', 'rate_per_hr'])]
 class Company extends Model
 {
     /**
@@ -19,6 +19,7 @@ class Company extends Model
     {
         return [
             'is_active' => 'boolean',
+            'rate_per_hr' => 'decimal:2',
         ];
     }
 
