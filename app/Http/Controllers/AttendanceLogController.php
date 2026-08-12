@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\AttendanceLog;
 use App\Models\Employee;
+use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -25,7 +28,7 @@ class AttendanceLogController extends Controller
             $logs = AttendanceLog::query()
                 ->visibleTo($viewer)
                 ->whereBetween('date', [$month->startOfMonth(), $month->endOfMonth()])
-                ->with(['employee:id,company_id,employee_no,first_name,middle_name,last_name', 'employee.company:id,name'])
+                ->with(['employee:id,company_id,employee_no,first_name,middle_name,last_name', 'employee.company:id,name', 'approver:id,name'])
                 ->latest('date')
                 ->latest('log_in_time')
                 ->get()
@@ -43,6 +46,8 @@ class AttendanceLogController extends Controller
                         'label' => "{$employee->employee_no} — {$employee->full_name}",
                     ]),
                 'statuses' => self::STATUSES,
+                'approvers' => $this->approvers($viewer)
+                    ->map(fn (User $user) => ['id' => $user->id, 'label' => $user->name]),
             ]);
         }
 
@@ -50,12 +55,13 @@ class AttendanceLogController extends Controller
         $logs = $employee
             ? $employee->attendanceLogs()
                 ->whereBetween('date', [$month->startOfMonth(), $month->endOfMonth()])
+                ->with('approver:id,name')
                 ->orderByDesc('date')
                 ->get()
             : collect();
 
         $workedMinutes = $logs->sum(fn (AttendanceLog $log) => $log->duration_minutes);
-        $todayLog = $employee?->attendanceLogs()->whereDate('date', today())->first();
+        $todayLog = $employee?->attendanceLogs()->with('approver:id,name')->whereDate('date', today())->first();
 
         return Inertia::render('AttendanceLogs/EmployeeIndex', [
             'logs' => $logs->map(fn (AttendanceLog $log) => $this->logPayload($log)),
@@ -89,6 +95,7 @@ class AttendanceLogController extends Controller
             'time_out' => ['nullable', 'date_format:H:i', 'after:time_in'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'status' => ['required', Rule::in(self::STATUSES)],
+            ...$this->approvalRules($request),
         ]);
 
         AttendanceLog::create([
@@ -98,6 +105,7 @@ class AttendanceLogController extends Controller
             'log_out_time' => $validated['time_out'] ?? null,
             'notes' => $validated['notes'] ?? null,
             'status' => $validated['status'],
+            ...$this->approvalAttributes($request, $validated),
         ]);
 
         return back()->with('success', 'Attendance log created.');
@@ -120,6 +128,7 @@ class AttendanceLogController extends Controller
             'time_out' => ['nullable', 'date_format:H:i', 'after:time_in'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'status' => ['required', Rule::in(self::STATUSES)],
+            ...$this->approvalRules($request),
         ]);
 
         abort_unless((int) $validated['employee_id'] === $attendanceLog->employee_id, 422, 'An attendance log cannot be moved to another employee.');
@@ -130,6 +139,7 @@ class AttendanceLogController extends Controller
             'log_out_time' => $validated['time_out'] ?? null,
             'notes' => $validated['notes'] ?? null,
             'status' => $validated['status'],
+            ...$this->approvalAttributes($request, $validated),
         ]);
 
         return back()->with('success', 'Attendance log updated.');
@@ -141,7 +151,12 @@ class AttendanceLogController extends Controller
         $this->assertLogInScope($request, $attendanceLog);
 
         abort_unless($attendanceLog->status === 'pending', 422, 'Only pending logs can be approved.');
-        $attendanceLog->update(['status' => 'approved']);
+        $attendanceLog->update([
+            'status' => 'approved',
+            'approved_by' => $request->user()->id,
+            'approved_at' => now(),
+            'reject_reason' => null,
+        ]);
 
         return back()->with('success', 'Attendance log approved.');
     }
@@ -181,6 +196,67 @@ class AttendanceLogController extends Controller
         return back()->with('success', 'Time out recorded.');
     }
 
+    /**
+     * The company_admins a log may be signed off by — the approver dropdown, and
+     * the whitelist the submitted approved_by is checked against.
+     *
+     * @return Collection<int, User>
+     */
+    private function approvers(User $viewer): Collection
+    {
+        return User::query()
+            ->visibleTo($viewer)
+            ->where('is_disabled', false)
+            ->whereHas('roles', fn (Builder $roles) => $roles->where('name', 'company_admin'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
+    /**
+     * A rejection needs a reason; an approval carries who signed it off and when.
+     * Fields belonging to the other status are simply ignored — approvalAttributes()
+     * blanks them out.
+     *
+     * @return array<string, list<mixed>>
+     */
+    private function approvalRules(Request $request): array
+    {
+        return [
+            'approved_by' => ['nullable', 'integer', Rule::in($this->approvers($request->user())->modelKeys())],
+            'approved_at' => ['nullable', 'date'],
+            'reject_reason' => [
+                Rule::requiredIf(fn () => $request->input('status') === 'rejected'),
+                'nullable', 'string', 'max:2000',
+            ],
+        ];
+    }
+
+    /**
+     * Keeps the three approval columns consistent with the status: only an
+     * approved log has an approver and a timestamp, only a rejected one a reason,
+     * and a log moved back to pending has neither.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function approvalAttributes(Request $request, array $validated): array
+    {
+        return match ($validated['status']) {
+            'approved' => [
+                // Blank means "me, now" — the common case when an admin approves inline.
+                'approved_by' => $validated['approved_by'] ?? $request->user()->id,
+                'approved_at' => $validated['approved_at'] ?? now(),
+                'reject_reason' => null,
+            ],
+            'rejected' => [
+                'approved_by' => null,
+                'approved_at' => null,
+                'reject_reason' => $validated['reject_reason'],
+            ],
+            default => ['approved_by' => null, 'approved_at' => null, 'reject_reason' => null],
+        };
+    }
+
     private function month(string $value): CarbonImmutable
     {
         try {
@@ -207,6 +283,12 @@ class AttendanceLogController extends Controller
             'status' => strtolower($log->status),
             'duration' => $log->duration,
             'duration_minutes' => $log->duration_minutes,
+            'approved_by' => $log->approved_by,
+            'approved_by_name' => $log->approver?->name,
+            // Two shapes: one the datetime-local input accepts, one for the table.
+            'approved_at' => $log->approved_at?->format('Y-m-d\TH:i'),
+            'approved_at_label' => $log->approved_at?->format('M j, Y g:i A'),
+            'reject_reason' => $log->reject_reason,
         ];
     }
 

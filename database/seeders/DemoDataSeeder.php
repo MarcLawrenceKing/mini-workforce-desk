@@ -31,7 +31,7 @@ class DemoDataSeeder extends Seeder
         }
 
         // Company One
-        $this->makeUser('admin@company1.com', 'company1admin', 'Company One Admin', $companyOne, 'company_admin');
+        $companyOneAdmin = $this->makeUser('admin@company1.com', 'company1admin', 'Company One Admin', $companyOne, 'company_admin');
 
         $employeeUser = $this->makeUser(
             'employee@company1.com',
@@ -63,7 +63,7 @@ class DemoDataSeeder extends Seeder
         $disabled->update(['is_disabled' => true]);
 
         // A second company so "company_admin cannot manage other companies" is testable.
-        $this->makeUser('admin@company2.com', 'company2admin', 'Company Two Admin', $companyTwo, 'company_admin');
+        $companyTwoAdmin = $this->makeUser('admin@company2.com', 'company2admin', 'Company Two Admin', $companyTwo, 'company_admin');
 
         $companyTwoEmployeeUser = $this->makeUser(
             'employee@company2.com',
@@ -86,11 +86,12 @@ class DemoDataSeeder extends Seeder
             ],
         );
 
-        $this->seedAttendanceLogs($companyOneEmployee);
-        $this->seedAttendanceLogs($companyTwoEmployee);
+        $this->seedAttendanceLogs($companyOneEmployee, $companyOneAdmin);
+        $this->seedAttendanceLogs($companyTwoEmployee, $companyTwoAdmin);
     }
 
-    private function seedAttendanceLogs(Employee $employee): void
+    /** One log per status, so the approval columns have something to show. */
+    private function seedAttendanceLogs(Employee $employee, User $approver): void
     {
         $logs = [
             [
@@ -99,6 +100,9 @@ class DemoDataSeeder extends Seeder
                 'log_out_time' => '17:00:00',
                 'notes' => 'Regular work day',
                 'status' => 'approved',
+                'approved_by' => $approver->id,
+                'approved_at' => '2026-08-10 18:00:00',
+                'reject_reason' => null,
             ],
             [
                 'date' => '2026-08-11',
@@ -106,6 +110,19 @@ class DemoDataSeeder extends Seeder
                 'log_out_time' => '17:30:00',
                 'notes' => 'Regular work day',
                 'status' => 'pending',
+                'approved_by' => null,
+                'approved_at' => null,
+                'reject_reason' => null,
+            ],
+            [
+                'date' => '2026-08-12',
+                'log_in_time' => '09:45:00',
+                'log_out_time' => '16:00:00',
+                'notes' => 'Late start',
+                'status' => 'rejected',
+                'approved_by' => null,
+                'approved_at' => null,
+                'reject_reason' => 'Times do not match the site log.',
             ],
         ];
 

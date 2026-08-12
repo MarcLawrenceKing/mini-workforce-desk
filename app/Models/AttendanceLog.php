@@ -8,19 +8,25 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['employee_id', 'date', 'log_in_time', 'log_out_time', 'notes', 'status'])]
+#[Fillable(['employee_id', 'date', 'log_in_time', 'log_out_time', 'notes', 'status', 'approved_by', 'approved_at', 'reject_reason'])]
 class AttendanceLog extends Model
 {
     protected $appends = ['duration', 'duration_minutes'];
 
     protected function casts(): array
     {
-        return ['date' => 'date:Y-m-d'];
+        return ['date' => 'date:Y-m-d', 'approved_at' => 'datetime'];
     }
 
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    /** The company_admin who approved (or rejected) the log. */
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
     public function scopeVisibleTo(Builder $query, User $viewer): Builder
