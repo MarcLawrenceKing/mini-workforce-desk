@@ -3,6 +3,7 @@ import { usePage } from "@inertiajs/vue3";
 import { useAuth } from "./useAuth";
 
 const LINKS = {
+    dashboard: { label: "Dashboard", href: "/dashboard", icon: "pi pi-chart-bar" },
     myAccount: { label: "My Account", href: "/my-account", icon: "pi pi-user" },
     users: { label: "Users", href: "/users", icon: "pi pi-users" },
     companies: { label: "Companies", href: "/companies", icon: "pi pi-building" },
@@ -16,7 +17,7 @@ const LINKS = {
 };
 
 const NAV_BY_ROLE = {
-    admin: ["myAccount", "users", "companies", "employees"],
+    admin: ["dashboard", "myAccount", "users", "companies", "employees"],
     company_admin: ["myAccount", "users", "companies", "employees", "attendanceLogs", "requests"],
     employee: ["myAccount", "attendanceLogs", "requests"],
 };

@@ -4,6 +4,7 @@ use App\Http\Controllers\AttendanceLogController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\MyAccountController;
 use App\Http\Controllers\UserController;
@@ -54,6 +55,10 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware(['auth', 'active'])->group(function () {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->middleware('role:admin')
+        ->name('dashboard');
 
     // Landing page for every role. No permission gate on purpose: everyone may
     // see and edit their own account.

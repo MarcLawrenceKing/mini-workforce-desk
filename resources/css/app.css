@@ -313,6 +313,53 @@ body {
         font-size: 1.5rem;
     }
 
+    .dashboard-filters {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        gap: 1rem;
+    }
+
+    .dashboard-filter-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .dashboard-filter-note {
+        margin-block-start: 0.75rem;
+    }
+
+    .kpi-grid {
+        display: grid;
+        gap: 1rem;
+    }
+
+    @media (min-width: 640px) {
+        .kpi-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    .kpi-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .kpi-value {
+        margin-block-start: 0.25rem;
+        font-size: 2rem;
+        line-height: 1;
+        font-weight: 600;
+    }
+
+    .kpi-icon {
+        color: var(--p-primary-color);
+        font-size: 1.75rem;
+    }
+
     .month-picker,
     .check-row,
     .attendance-filters {
