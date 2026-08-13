@@ -78,7 +78,8 @@ class RedisCacheQueueTest extends TestCase
             ->put("/attendance-logs/{$log->id}/approve")
             ->assertSessionHas('success');
 
-        Queue::assertPushed(
+        Queue::assertPushedOn(
+            'notifications',
             SendTimeLogApprovedNotification::class,
             fn($job) => $job->attendanceLog->id === $log->id && $job->decision === 'approved',
         );

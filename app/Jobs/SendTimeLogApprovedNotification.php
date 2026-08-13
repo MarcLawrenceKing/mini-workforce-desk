@@ -34,7 +34,9 @@ class SendTimeLogApprovedNotification implements ShouldQueue
     public function __construct(
         public AttendanceLog $attendanceLog,
         public string $decision,
-    ) {}
+    ) {
+        $this->onQueue('notifications');
+    }
 
     public function handle(): void
     {
