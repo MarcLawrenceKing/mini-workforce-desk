@@ -9,11 +9,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Observers\DashboardCacheObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 
 #[Fillable([
-    'user_id', 'company_id', 'employee_no',
-    'first_name', 'middle_name', 'last_name',
+    'user_id',
+    'company_id',
+    'employee_no',
+    'first_name',
+    'middle_name',
+    'last_name',
 ])]
+#[ObservedBy(DashboardCacheObserver::class)]
+
 class Employee extends Model
 {
     use SoftDeletes;
@@ -24,7 +32,7 @@ class Employee extends Model
     protected function fullName(): Attribute
     {
         return Attribute::get(
-            fn () => trim(implode(' ', array_filter([
+            fn() => trim(implode(' ', array_filter([
                 $this->first_name,
                 $this->middle_name,
                 $this->last_name,
@@ -51,7 +59,7 @@ class Employee extends Model
     {
         return $query->when(
             ! $viewer->hasRole('admin'),
-            fn (Builder $q) => $q->where('company_id', $viewer->company_id),
+            fn(Builder $q) => $q->where('company_id', $viewer->company_id),
         );
     }
 }

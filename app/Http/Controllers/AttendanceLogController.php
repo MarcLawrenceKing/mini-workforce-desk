@@ -13,6 +13,9 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Jobs\SendTimeLogApprovedNotification;
+
+
 
 class AttendanceLogController extends Controller
 {
@@ -32,7 +35,7 @@ class AttendanceLogController extends Controller
                 ->latest('date')
                 ->latest('log_in_time')
                 ->get()
-                ->map(fn (AttendanceLog $log) => $this->logPayload($log));
+                ->map(fn(AttendanceLog $log) => $this->logPayload($log));
 
             return Inertia::render('AttendanceLogs/AdminIndex', [
                 'logs' => $logs,
@@ -41,30 +44,30 @@ class AttendanceLogController extends Controller
                     ->visibleTo($viewer)
                     ->orderBy('last_name')
                     ->get()
-                    ->map(fn (Employee $employee) => [
+                    ->map(fn(Employee $employee) => [
                         'id' => $employee->id,
                         'label' => "{$employee->employee_no} — {$employee->full_name}",
                     ]),
                 'statuses' => self::STATUSES,
                 'approvers' => $this->approvers($viewer)
-                    ->map(fn (User $user) => ['id' => $user->id, 'label' => $user->name]),
+                    ->map(fn(User $user) => ['id' => $user->id, 'label' => $user->name]),
             ]);
         }
 
         $employee = $viewer->employee;
         $logs = $employee
             ? $employee->attendanceLogs()
-                ->whereBetween('date', [$month->startOfMonth(), $month->endOfMonth()])
-                ->with('approver:id,name')
-                ->orderByDesc('date')
-                ->get()
+            ->whereBetween('date', [$month->startOfMonth(), $month->endOfMonth()])
+            ->with('approver:id,name')
+            ->orderByDesc('date')
+            ->get()
             : collect();
 
-        $workedMinutes = $logs->sum(fn (AttendanceLog $log) => $log->duration_minutes);
+        $workedMinutes = $logs->sum(fn(AttendanceLog $log) => $log->duration_minutes);
         $todayLog = $employee?->attendanceLogs()->with('approver:id,name')->whereDate('date', today())->first();
 
         return Inertia::render('AttendanceLogs/EmployeeIndex', [
-            'logs' => $logs->map(fn (AttendanceLog $log) => $this->logPayload($log)),
+            'logs' => $logs->map(fn(AttendanceLog $log) => $this->logPayload($log)),
             'month' => $month->format('Y-m'),
             'today' => today()->toDateString(),
             'todayLog' => $todayLog ? $this->logPayload($todayLog) : null,
@@ -88,7 +91,8 @@ class AttendanceLogController extends Controller
         $validated = $request->validate([
             'employee_id' => ['required', 'integer'],
             'date' => [
-                'required', 'date',
+                'required',
+                'date',
                 Rule::unique('attendance_logs', 'date')->where('employee_id', $employee->id),
             ],
             'time_in' => ['required', 'date_format:H:i'],
@@ -116,10 +120,13 @@ class AttendanceLogController extends Controller
         $this->assertManager($request);
         $this->assertLogInScope($request, $attendanceLog);
 
+        $previousStatus = $attendanceLog->status;
+
         $validated = $request->validate([
             'employee_id' => ['required', 'integer'],
             'date' => [
-                'required', 'date',
+                'required',
+                'date',
                 Rule::unique('attendance_logs', 'date')
                     ->where('employee_id', $attendanceLog->employee_id)
                     ->ignore($attendanceLog->id),
@@ -142,6 +149,15 @@ class AttendanceLogController extends Controller
             ...$this->approvalAttributes($request, $validated),
         ]);
 
+        // Only on a real transition — re-saving an already-approved log with no
+        // status change shouldn't re-notify the employee.
+        if (
+            $validated['status'] !== $previousStatus
+            && in_array($validated['status'], ['approved', 'rejected'], true)
+        ) {
+            SendTimeLogApprovedNotification::dispatch($attendanceLog, $validated['status']);
+        }
+
         return back()->with('success', 'Attendance log updated.');
     }
 
@@ -157,6 +173,9 @@ class AttendanceLogController extends Controller
             'approved_at' => now(),
             'reject_reason' => null,
         ]);
+
+        // Queued, not run inline — the admin gets their redirect immediately.
+        SendTimeLogApprovedNotification::dispatch($attendanceLog, 'approved');
 
         return back()->with('success', 'Attendance log approved.');
     }
@@ -207,7 +226,7 @@ class AttendanceLogController extends Controller
         return User::query()
             ->visibleTo($viewer)
             ->where('is_disabled', false)
-            ->whereHas('roles', fn (Builder $roles) => $roles->where('name', 'company_admin'))
+            ->whereHas('roles', fn(Builder $roles) => $roles->where('name', 'company_admin'))
             ->orderBy('name')
             ->get(['id', 'name']);
     }
@@ -225,8 +244,10 @@ class AttendanceLogController extends Controller
             'approved_by' => ['nullable', 'integer', Rule::in($this->approvers($request->user())->modelKeys())],
             'approved_at' => ['nullable', 'date'],
             'reject_reason' => [
-                Rule::requiredIf(fn () => $request->input('status') === 'rejected'),
-                'nullable', 'string', 'max:2000',
+                Rule::requiredIf(fn() => $request->input('status') === 'rejected'),
+                'nullable',
+                'string',
+                'max:2000',
             ],
         ];
     }

@@ -14,9 +14,13 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laratrust\Contracts\LaratrustUser;
 use Laratrust\Traits\HasRolesAndPermissions;
+use App\Observers\DashboardCacheObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 
 #[Fillable(['company_id', 'name', 'email', 'username', 'password', 'is_disabled'])]
 #[Hidden(['password', 'remember_token'])]
+#[ObservedBy(DashboardCacheObserver::class)]
+
 class User extends Authenticatable implements LaratrustUser
 {
     /** @use HasFactory<UserFactory> */
@@ -53,7 +57,7 @@ class User extends Authenticatable implements LaratrustUser
     public static function adminExists(): bool
     {
         return static::query()
-            ->whereHas('roles', fn (Builder $query) => $query->where('name', 'admin'))
+            ->whereHas('roles', fn(Builder $query) => $query->where('name', 'admin'))
             ->exists();
     }
 
@@ -65,7 +69,7 @@ class User extends Authenticatable implements LaratrustUser
     {
         return $query->when(
             ! $viewer->hasRole('admin'),
-            fn (Builder $q) => $q->where('company_id', $viewer->company_id),
+            fn(Builder $q) => $q->where('company_id', $viewer->company_id),
         );
     }
 }

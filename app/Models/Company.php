@@ -6,8 +6,12 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Observers\DashboardCacheObserver;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 
 #[Fillable(['name', 'is_active', 'rate_per_hr'])]
+#[ObservedBy(DashboardCacheObserver::class)]
+
 class Company extends Model
 {
     /**
@@ -38,7 +42,7 @@ class Company extends Model
     {
         return $query->when(
             ! $viewer->hasRole('admin'),
-            fn (Builder $q) => $q->whereKey($viewer->company_id),
+            fn(Builder $q) => $q->whereKey($viewer->company_id),
         );
     }
 }
