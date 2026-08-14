@@ -1,58 +1,130 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Mini Workforce Desk
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A small workforce management app: companies, employees, attendance logs, and approvals.
 
-## About Laravel
+**Stack:** Laravel 13 · Inertia + Vue 3 · PrimeVue · Tailwind 4 · MySQL · Redis · Socket.IO · Sanctum · Laratrust
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+See [ARCHITECTURE.md](ARCHITECTURE.md) for how the pieces fit together, and [SKILLS.md](SKILLS.md) for the skills checklist.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Requirements
 
-## Learning Laravel
+| Tool     | Version |
+| -------- | ------- |
+| PHP      | 8.3+ (with `redis`, `pdo_mysql`) |
+| Composer | 2.8+    |
+| Node.js  | 20+     |
+| MySQL    | 8.0+    |
+| Redis    | 7.0+    |
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Install
 
 ```bash
-composer require laravel/boost --dev
+git clone <repo-url>
+cd mini-workforce-desk
 
-php artisan boost:install
+composer install
+npm install
+
+cp .env.example .env
+php artisan key:generate
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Edit `.env` — set your MySQL credentials and a value for `REALTIME_SECRET`:
 
-## Contributing
+```dotenv
+DB_DATABASE=mini_workforce_desk
+DB_USERNAME=root
+DB_PASSWORD=
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+REALTIME_SECRET=any-random-string
+```
 
-## Code of Conduct
+Create the database, then run:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+php artisan migrate --seed
+php artisan storage:link
+npm run build
+```
 
-## Security Vulnerabilities
+## Services to run
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Each in its own terminal.
 
-## License
+| # | Service       | Command                     | Notes                          |
+| - | ------------- | --------------------------- | ------------------------------ |
+| 1 | MySQL         | (system service)            | Must be running before migrate |
+| 2 | Redis         | `redis-server`              | Cache, queue, and sessions     |
+| 3 | Laravel       | `php artisan serve`         | http://127.0.0.1:8000          |
+| 4 | Vite          | `npm run dev`               | Frontend assets (dev only)     |
+| 5 | Queue worker  | `php artisan queue:work --queue=notifications` | Approval notifications |
+| 6 | Socket server | `npm run socket`            | http://127.0.0.1:3001          |
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Open http://127.0.0.1:8000 and log in.
+
+## Demo accounts
+
+Seeded by `php artisan db:seed`. Password for all accounts: **`password`**
+
+| Email                    | Role            | Notes                                |
+| ------------------------ | --------------- | ------------------------------------ |
+| admin@test.com           | `admin`         | Full system access, no company        |
+| admin@company1.com       | `company_admin` | Manages Company One                   |
+| employee@company1.com    | `employee`      | Own attendance logs only              |
+| admin@company2.com       | `company_admin` | Manages Company Two                   |
+| employee@company2.com    | `employee`      | Own attendance logs only              |
+| disabled@company1.com    | `employee`      | Disabled — blocked at login           |
+
+> The seeder skips `admin@test.com` if an admin already exists. `/register` is a one-time
+> admin bootstrap and closes itself once that admin is created.
+
+## Roles
+
+| Role            | Can do                                                          |
+| --------------- | --------------------------------------------------------------- |
+| `admin`         | Users, companies, employees                                      |
+| `company_admin` | Own company's users, employees, attendance logs, approvals, CSV export |
+| `employee`      | Own account and own attendance logs                              |
+
+Anything outside a role returns **403** (JSON for API, redirect with a flash message for pages).
+
+## API
+
+Session-authenticated for the Vue app, bearer-token for external clients.
+
+```bash
+# Get a token
+curl -X POST http://127.0.0.1:8000/api/login \
+  -H "Accept: application/json" \
+  -d "email=employee@company1.com&password=password&device_name=postman"
+
+# Use it
+curl http://127.0.0.1:8000/api/time-logs \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer <token>"
+```
+
+Endpoints: `/api/login` · `/api/logout` · `/api/user` · `/api/time-logs` (CRUD) ·
+`/api/time-logs/{id}/approve` · `/api/time-logs/export`
+
+A Postman collection is in [docs/postman/](docs/postman/).
+
+## Artisan commands
+
+```bash
+php artisan timelogs:flag-missing   # Flag employees with no attendance log today
+```
+
+## Tests
+
+```bash
+php artisan test
+```
+
+## Other docs
+
+- [SETUP.md](SETUP.md) — local environment setup notes
+- [CACHE_AND_QUEUE.md](CACHE_AND_QUEUE.md) — Redis cache and queue details
+- `TASK-*-GUIDE.md` — per-task implementation notes
