@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Models\User;
+use App\Services\RealtimeUsersKpi;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -56,7 +57,7 @@ class UserController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, RealtimeUsersKpi $realtime): RedirectResponse
     {
         $viewer = $request->user();
 
@@ -79,6 +80,8 @@ class UserController extends Controller
         ]);
 
         $user->syncRoles([$validated['role']]);
+
+        $realtime->publish();
 
         return back()->with('success', 'User created.');
     }

@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'realtime' => [
+        'enabled' => env('REALTIME_ENABLED', false),
+        'url' => env('REALTIME_SERVER_URL', 'http://127.0.0.1:3001'),
+        'secret' => env('REALTIME_SECRET'),
+    ],
+
 ];

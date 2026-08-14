@@ -4,7 +4,9 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "socket": "node --env-file=.env socket-server/server.js",
+        "socket:test": "node --env-file=.env socket-server/smoke-test.js"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
@@ -21,6 +23,8 @@
         "axios": "^1.19.0",
         "primeicons": "^8.0.0",
         "primevue": "^4.5.5",
+        "socket.io": "^4.8.1",
+        "socket.io-client": "^4.8.1",
         "vue": "^3.5.41"
     }
 }

@@ -1,6 +1,7 @@
 <script setup>
-import { reactive } from "vue";
+import { onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { Head, router } from "@inertiajs/vue3";
+import { io } from "socket.io-client";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import InputText from "primevue/inputtext";
@@ -20,6 +21,41 @@ const range = reactive({
     from: props.filters.from ?? "",
     to: props.filters.to ?? "",
 });
+
+const liveUsersCount = ref(props.kpis.users);
+const socketConnected = ref(false);
+let socket;
+
+watch(
+    () => props.kpis.users,
+    (users) => {
+        liveUsersCount.value = users;
+    },
+);
+
+onMounted(() => {
+    socket = io(import.meta.env.VITE_SOCKET_URL ?? "http://127.0.0.1:3001");
+
+    socket.on("connect", () => {
+        socketConnected.value = true;
+    });
+
+    socket.on("disconnect", () => {
+        socketConnected.value = false;
+    });
+
+    socket.on("users.kpi.updated", ({ users }) => {
+        if (Number.isInteger(users) && users >= 0) {
+            liveUsersCount.value = users;
+        }
+    });
+});
+
+onBeforeUnmount(() => socket?.disconnect());
+
+function cardValue(key) {
+    return key === "users" ? liveUsersCount.value : props.kpis[key];
+}
 
 const cards = [
     { key: "employees", label: "Employee Count", icon: "pi pi-id-card" },
@@ -90,7 +126,10 @@ function clearFilters() {
                     <div class="kpi-content">
                         <div>
                             <p class="app-hint">{{ card.label }}</p>
-                            <p class="kpi-value">{{ kpis[card.key] }}</p>
+                            <p class="kpi-value">{{ cardValue(card.key) }}</p>
+                            <small v-if="card.key === 'users'" class="app-hint">
+                                {{ socketConnected ? "Live" : "Realtime offline" }}
+                            </small>
                         </div>
                         <i :class="[card.icon, 'kpi-icon']" aria-hidden="true" />
                     </div>
