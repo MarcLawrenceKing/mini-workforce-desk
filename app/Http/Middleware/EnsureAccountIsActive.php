@@ -18,10 +18,14 @@ class EnsureAccountIsActive
         $user = $request->user();
 
         if ($user && $user->is_disabled) {
-            Auth::guard('web')->logout();
+            // A token client (Postman, a mobile app) has no session to tear down,
+            // and asking for one would throw. Only browser requests get logged out.
+            if ($request->hasSession()) {
+                Auth::guard('web')->logout();
 
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
 
             if ($request->expectsJson()) {
                 abort(403, 'Your account has been disabled.');

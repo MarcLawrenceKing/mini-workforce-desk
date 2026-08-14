@@ -1,0 +1,283 @@
+{
+  "info": {
+    "name": "Mini Workforce Desk — API (Task 9)",
+    "description": "Time-log API for Mini Workforce Desk.\n\nHOW TO USE\n1. Start the app:  composer dev\n2. Run \"1. Login (company_admin)\" — it saves the token into the {{token}} collection variable automatically.\n3. Run anything else. Every request inherits Bearer {{token}} from the collection.\n\nSeeded logins (all with password `password`):\n  admin@company1.com     company_admin — full read/write for Company One\n  employee@company1.com  employee      — reads own logs, every write is a 403\n  admin@test.com         admin         — no attendance-logs.view, so a 403\n  disabled@company1.com  disabled      — refused a token entirely\n\nThe folder \"Failure cases\" is not broken — every request in it is SUPPOSED to fail, and shows what each error looks like.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "log_id", "value": "1", "type": "string" },
+    { "key": "employee_id", "value": "1", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Login (company_admin)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Saves the token so every other request in this collection just works.",
+              "if (pm.response.code === 200) {",
+              "    pm.collectionVariables.set('token', pm.response.json().token);",
+              "    console.log('Token saved to {{token}}');",
+              "}",
+              "pm.test('200 and a token came back', function () {",
+              "    pm.response.to.have.status(200);",
+              "    pm.expect(pm.response.json().token).to.be.a('string');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"admin@company1.com\",\n  \"password\": \"password\",\n  \"device_name\": \"postman\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": { "raw": "{{base_url}}/api/login", "host": ["{{base_url}}"], "path": ["api", "login"] },
+        "description": "Trades credentials for a personal access token. This is the ONLY endpoint that does not need a token.\n\nExpect 200 and:\n{ \"token\": \"1|xJ9k…\", \"user\": { \"id\": 2, \"roles\": [\"company_admin\"], … } }"
+      }
+    },
+    {
+      "name": "2. Who am I",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/api/user", "host": ["{{base_url}}"], "path": ["api", "user"] },
+        "description": "Confirms the token works and shows which roles and permissions it carries. Run this first whenever something 403s unexpectedly."
+      }
+    },
+    {
+      "name": "3. List time logs",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": {
+          "raw": "{{base_url}}/api/time-logs?month=2026-08",
+          "host": ["{{base_url}}"],
+          "path": ["api", "time-logs"],
+          "query": [
+            { "key": "month", "value": "2026-08", "description": "YYYY-MM. Defaults to the current month. An unparseable value falls back to the current month rather than erroring." },
+            { "key": "status", "value": "pending", "description": "pending | approved | rejected", "disabled": true },
+            { "key": "employee_id", "value": "{{employee_id}}", "description": "Filter to one employee", "disabled": true }
+          ]
+        },
+        "description": "200 with { data: [...], meta: { month, total, worked_minutes } }.\n\nA company_admin sees its whole company; an employee sees only its own rows — same query, different result, decided by the token."
+      }
+    },
+    {
+      "name": "4. Show one time log",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/api/time-logs/{{log_id}}", "host": ["{{base_url}}"], "path": ["api", "time-logs", "{{log_id}}"] },
+        "description": "200 with { data: { … } }. A log belonging to another company is a 403, not a 404 — see \"Failure cases\"."
+      }
+    },
+    {
+      "name": "5. Create a time log",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Remember the new id so requests 6-8 operate on it.",
+              "if (pm.response.code === 201) {",
+              "    pm.collectionVariables.set('log_id', pm.response.json().data.id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"employee_id\": {{employee_id}},\n  \"date\": \"2026-08-25\",\n  \"time_in\": \"09:00\",\n  \"time_out\": \"18:00\",\n  \"status\": \"pending\",\n  \"notes\": \"Created from Postman\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": { "raw": "{{base_url}}/api/time-logs", "host": ["{{base_url}}"], "path": ["api", "time-logs"] },
+        "description": "201 with the created row. Times are HH:MM (24h). One log per employee per date — a second one for the same day is a 422.\n\nIf you re-run this and get a 422 about the date, change the date or delete the row with request 8."
+      }
+    },
+    {
+      "name": "6. Update a time log",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"employee_id\": {{employee_id}},\n  \"date\": \"2026-08-25\",\n  \"time_in\": \"09:00\",\n  \"time_out\": \"19:30\",\n  \"status\": \"pending\",\n  \"notes\": \"Overtime, updated from Postman\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": { "raw": "{{base_url}}/api/time-logs/{{log_id}}", "host": ["{{base_url}}"], "path": ["api", "time-logs", "{{log_id}}"] },
+        "description": "PUT replaces the whole record, so send every field — not just the ones you changed.\n\n`employee_id` must stay the same: a log cannot be moved to another employee (422 if you try)."
+      }
+    },
+    {
+      "name": "7. Approve a time log",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/api/time-logs/{{log_id}}/approve", "host": ["{{base_url}}"], "path": ["api", "time-logs", "{{log_id}}", "approve"] },
+        "description": "No body needed. Stamps approved_by = you and approved_at = now, and queues the employee's notification (Task 8).\n\nOnly a pending log can be approved — run it twice and the second call is a 422."
+      }
+    },
+    {
+      "name": "8. Delete a time log",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/api/time-logs/{{log_id}}", "host": ["{{base_url}}"], "path": ["api", "time-logs", "{{log_id}}"] },
+        "description": "204 No Content, and the response body is empty. That is success — check the status code, not the body. This is a hard delete."
+      }
+    },
+    {
+      "name": "9. Logout (revoke this token)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/api/logout", "host": ["{{base_url}}"], "path": ["api", "logout"] },
+        "description": "204. Revokes only the token that made this call, so signing out of Postman does not sign you out anywhere else.\n\nAfter this, every other request 401s until you run request 1 again."
+      }
+    },
+    {
+      "name": "Failure cases",
+      "description": "Every request in here is meant to fail. They document what each error looks like.",
+      "item": [
+        {
+          "name": "401 — no token at all",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/time-logs", "host": ["{{base_url}}"], "path": ["api", "time-logs"] },
+            "description": "401 { \"message\": \"Unauthenticated.\" }\n\n401 means \"I don't know who you are\". Compare with 403 below."
+          }
+        },
+        {
+          "name": "403 — logged in, but not allowed",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Log in as the employee, whose writes are refused by design.",
+                  "pm.sendRequest({",
+                  "    url: pm.collectionVariables.get('base_url') + '/api/login',",
+                  "    method: 'POST',",
+                  "    header: { 'Accept': 'application/json', 'Content-Type': 'application/json' },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ email: 'employee@company1.com', password: 'password', device_name: 'postman-employee' }) }",
+                  "}, function (err, res) {",
+                  "    if (!err && res.code === 200) {",
+                  "        pm.collectionVariables.set('employee_token', res.json().token);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{employee_token}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/time-logs/1", "host": ["{{base_url}}"], "path": ["api", "time-logs", "1"] },
+            "description": "403. An employee may read its own logs but never write.\n\n403 means \"I know exactly who you are, and the answer is still no\". No amount of re-logging-in fixes a 403 — that's the difference from 401."
+          }
+        },
+        {
+          "name": "422 — time_out before time_in",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employee_id\": {{employee_id}},\n  \"date\": \"2026-08-26\",\n  \"time_in\": \"17:00\",\n  \"time_out\": \"08:00\",\n  \"status\": \"pending\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/time-logs", "host": ["{{base_url}}"], "path": ["api", "time-logs"] },
+            "description": "422 {\n  \"message\": \"The time out field must be a date after time in.\",\n  \"errors\": { \"time_out\": [\"…\"] }\n}\n\nThat `errors` object is exactly what the Vue side renders under the input fields."
+          }
+        },
+        {
+          "name": "422 — rejecting without a reason",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employee_id\": {{employee_id}},\n  \"date\": \"2026-08-27\",\n  \"time_in\": \"09:00\",\n  \"time_out\": \"18:00\",\n  \"status\": \"rejected\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/time-logs", "host": ["{{base_url}}"], "path": ["api", "time-logs"] },
+            "description": "422 with errors.reject_reason — the employee has to be told why their attendance was rejected."
+          }
+        },
+        {
+          "name": "422 — employee from another company",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employee_id\": 2,\n  \"date\": \"2026-08-28\",\n  \"time_in\": \"09:00\",\n  \"time_out\": \"18:00\",\n  \"status\": \"pending\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/time-logs", "host": ["{{base_url}}"], "path": ["api", "time-logs"] },
+            "description": "422 errors.employee_id — \"That employee is not part of your company.\"\n\nCompany boundaries hold on the API exactly as they do in the web UI."
+          }
+        },
+        {
+          "name": "422 — bad credentials",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@company1.com\",\n  \"password\": \"wrong-password\",\n  \"device_name\": \"postman\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/login", "host": ["{{base_url}}"], "path": ["api", "login"] },
+            "description": "422, not 401. The request is understood, the data is simply wrong — so it comes back in the same { message, errors } envelope every other validation failure uses, and a client needs only one error handler."
+          }
+        }
+      ]
+    }
+  ]
+}

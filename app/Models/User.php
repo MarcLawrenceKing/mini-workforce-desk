@@ -14,6 +14,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laratrust\Contracts\LaratrustUser;
 use Laratrust\Traits\HasRolesAndPermissions;
+use Laravel\Sanctum\HasApiTokens;
 use App\Observers\DashboardCacheObserver;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 
@@ -24,7 +25,9 @@ use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 class User extends Authenticatable implements LaratrustUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasRolesAndPermissions, Notifiable;
+    // HasApiTokens is Task 9: it adds createToken()/tokens() so a user can hold
+    // personal access tokens for the /api routes.
+    use HasApiTokens, HasFactory, HasRolesAndPermissions, Notifiable;
 
     /**
      * Get the attributes that should be cast.

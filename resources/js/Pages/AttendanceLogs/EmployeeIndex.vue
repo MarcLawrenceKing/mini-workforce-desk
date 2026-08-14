@@ -1,7 +1,8 @@
 <script setup>
-import { computed, ref } from "vue";
-import { Head, router, useForm } from "@inertiajs/vue3";
+import { computed, ref, watch } from "vue";
+import { Head, useForm } from "@inertiajs/vue3";
 import { useConfirm } from "primevue/useconfirm";
+import { useApi } from "@/Composables/useApi";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import Column from "primevue/column";
@@ -24,24 +25,54 @@ const dialogVisible = ref(false);
 const confirm = useConfirm();
 const form = useForm({ notes: "" });
 
+/*
+ * Task 9 — browsing months now goes through the JSON API with Axios rather than
+ * a full Inertia page visit. Check in / check out stay on Inertia: the API is
+ * read-only for an employee (every write is a deliberate 403), and a form
+ * submission is a page-shaped action anyway.
+ *
+ * Local copies, because Axios has to write its answer somewhere and Inertia
+ * props are read-only.
+ */
+const rows = ref([...props.logs]);
+const month = ref(props.month);
+const workedMinutes = ref(props.summary.worked_minutes);
+const { loading, message, call, clear } = useApi();
+
+watch(() => props.logs, (logs) => { rows.value = [...logs]; });
+watch(() => props.month, (value) => { month.value = value; });
+watch(() => props.summary.worked_minutes, (value) => { workedMinutes.value = value; });
+
 const monthLabel = computed(() =>
     new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric", timeZone: "UTC" })
-        .format(new Date(`${props.month}-01T00:00:00Z`)),
+        .format(new Date(`${month.value}-01T00:00:00Z`)),
 );
 const workedHours = computed(() => {
-    const minutes = props.summary.worked_minutes;
+    const minutes = workedMinutes.value;
     return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 });
+const expectedSalary = computed(() =>
+    Math.round((workedMinutes.value / 60) * props.summary.rate_per_hr * 100) / 100,
+);
 const money = (value) => new Intl.NumberFormat(undefined, {
     style: "currency", currency: "PHP",
 }).format(value);
 
-function changeMonth(offset) {
-    const date = new Date(`${props.month}-01T00:00:00Z`);
+/** GET /api/time-logs?month=… — the API already scopes this to my own logs. */
+async function changeMonth(offset) {
+    const date = new Date(`${month.value}-01T00:00:00Z`);
     date.setUTCMonth(date.getUTCMonth() + offset);
-    router.get("/attendance-logs", { month: date.toISOString().slice(0, 7) }, {
-        preserveState: true, preserveScroll: true, replace: true,
-    });
+    const target = date.toISOString().slice(0, 7);
+
+    try {
+        const { data } = await call((api) => api.get("/time-logs", { params: { month: target } }));
+        rows.value = data.data;
+        month.value = data.meta.month;
+        // The API totals the minutes, so the salary card recalculates for free.
+        workedMinutes.value = data.meta.worked_minutes;
+    } catch {
+        // useApi filled `message`; the month on screen is unchanged.
+    }
 }
 
 function openAttendance() {
@@ -88,6 +119,9 @@ const statusSeverity = (status) => ({
             Your user account must be linked to an employee record before you can log attendance.
         </Message>
 
+        <!-- Anything the API refused (403 / 404 / 500). A 401 never reaches here: the interceptor sends you to /login. -->
+        <Message v-if="message" severity="error" closable @close="clear()">{{ message }}</Message>
+
         <div class="attendance-summary">
             <Card>
                 <template #title>Hrs worked this month</template>
@@ -96,7 +130,7 @@ const statusSeverity = (status) => ({
             <Card>
                 <template #title>Expected salary this month</template>
                 <template #content>
-                    <strong class="summary-value">{{ money(summary.expected_salary) }}</strong>
+                    <strong class="summary-value">{{ money(expectedSalary) }}</strong>
                     <p class="app-hint">At {{ money(summary.rate_per_hr) }} per hour</p>
                 </template>
             </Card>
@@ -105,13 +139,14 @@ const statusSeverity = (status) => ({
         <Card>
             <template #title>
                 <div class="month-picker">
-                    <Button icon="pi pi-chevron-left" aria-label="Previous month" text rounded @click="changeMonth(-1)" />
+                    <Button icon="pi pi-chevron-left" aria-label="Previous month" text rounded :disabled="loading" @click="changeMonth(-1)" />
                     <span>{{ monthLabel }}</span>
-                    <Button icon="pi pi-chevron-right" aria-label="Next month" text rounded @click="changeMonth(1)" />
+                    <Button icon="pi pi-chevron-right" aria-label="Next month" text rounded :disabled="loading" @click="changeMonth(1)" />
+                    <i v-if="loading" class="pi pi-spin pi-spinner app-muted" aria-label="Loading" />
                 </div>
             </template>
             <template #content>
-                <DataTable :value="logs" dataKey="id" responsiveLayout="scroll">
+                <DataTable :value="rows" dataKey="id" responsiveLayout="scroll">
                     <template #empty><div class="empty-state"><i class="pi pi-calendar app-muted" /><p class="app-hint">No attendance recorded this month.</p></div></template>
                     <Column field="date" header="Date" sortable />
                     <Column field="time_in" header="Time in"><template #body="{ data }">{{ data.time_in ?? "Not logged in yet" }}</template></Column>

@@ -2,6 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\NotifiesTimeLogDecision;
+use App\Http\Requests\StoreTimeLogRequest;
+use App\Http\Requests\TimeLogRequest;
+use App\Http\Requests\UpdateTimeLogRequest;
+use App\Http\Resources\TimeLogResource;
 use App\Models\AttendanceLog;
 use App\Models\Employee;
 use App\Models\User;
@@ -10,7 +15,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Jobs\SendTimeLogApprovedNotification;
@@ -19,7 +23,9 @@ use App\Jobs\SendTimeLogApprovedNotification;
 
 class AttendanceLogController extends Controller
 {
-    private const STATUSES = ['pending', 'approved', 'rejected'];
+    use NotifiesTimeLogDecision;
+
+    private const STATUSES = TimeLogRequest::STATUSES;
 
     public function index(Request $request): Response
     {
@@ -83,80 +89,21 @@ class AttendanceLogController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    // Validation, scoping and the column mapping all live in the form requests
+    // now, so the API (Task 9) enforces byte-for-byte the same rules.
+    public function store(StoreTimeLogRequest $request): RedirectResponse
     {
-        $this->assertManager($request);
-        $employee = $this->employeeInScope($request, $request->integer('employee_id'));
-
-        $validated = $request->validate([
-            'employee_id' => ['required', 'integer'],
-            'date' => [
-                'required',
-                'date',
-                Rule::unique('attendance_logs', 'date')->where('employee_id', $employee->id),
-            ],
-            'time_in' => ['required', 'date_format:H:i'],
-            'time_out' => ['nullable', 'date_format:H:i', 'after:time_in'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-            'status' => ['required', Rule::in(self::STATUSES)],
-            ...$this->approvalRules($request),
-        ]);
-
-        AttendanceLog::create([
-            'employee_id' => $employee->id,
-            'date' => $validated['date'],
-            'log_in_time' => $validated['time_in'],
-            'log_out_time' => $validated['time_out'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-            'status' => $validated['status'],
-            ...$this->approvalAttributes($request, $validated),
-        ]);
+        AttendanceLog::create($request->toAttributes());
 
         return back()->with('success', 'Attendance log created.');
     }
 
-    public function update(Request $request, AttendanceLog $attendanceLog): RedirectResponse
+    public function update(UpdateTimeLogRequest $request, AttendanceLog $attendanceLog): RedirectResponse
     {
-        $this->assertManager($request);
-        $this->assertLogInScope($request, $attendanceLog);
-
         $previousStatus = $attendanceLog->status;
 
-        $validated = $request->validate([
-            'employee_id' => ['required', 'integer'],
-            'date' => [
-                'required',
-                'date',
-                Rule::unique('attendance_logs', 'date')
-                    ->where('employee_id', $attendanceLog->employee_id)
-                    ->ignore($attendanceLog->id),
-            ],
-            'time_in' => ['required', 'date_format:H:i'],
-            'time_out' => ['nullable', 'date_format:H:i', 'after:time_in'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-            'status' => ['required', Rule::in(self::STATUSES)],
-            ...$this->approvalRules($request),
-        ]);
-
-        abort_unless((int) $validated['employee_id'] === $attendanceLog->employee_id, 422, 'An attendance log cannot be moved to another employee.');
-
-        $attendanceLog->update([
-            'date' => $validated['date'],
-            'log_in_time' => $validated['time_in'],
-            'log_out_time' => $validated['time_out'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-            'status' => $validated['status'],
-            ...$this->approvalAttributes($request, $validated),
-        ]);
-
-        // Only on a real transition — re-saving an already-approved log with no
-        // status change shouldn't re-notify the employee.
-        if (
-            $validated['status'] !== $previousStatus
-            && in_array($validated['status'], ['approved', 'rejected'], true)
-        ) {
-            SendTimeLogApprovedNotification::dispatch($attendanceLog, $validated['status']);
-        }
+        $attendanceLog->update($request->toAttributes());
+        $this->notifyOnDecision($attendanceLog, $previousStatus);
 
         return back()->with('success', 'Attendance log updated.');
     }
@@ -231,53 +178,6 @@ class AttendanceLogController extends Controller
             ->get(['id', 'name']);
     }
 
-    /**
-     * A rejection needs a reason; an approval carries who signed it off and when.
-     * Fields belonging to the other status are simply ignored — approvalAttributes()
-     * blanks them out.
-     *
-     * @return array<string, list<mixed>>
-     */
-    private function approvalRules(Request $request): array
-    {
-        return [
-            'approved_by' => ['nullable', 'integer', Rule::in($this->approvers($request->user())->modelKeys())],
-            'approved_at' => ['nullable', 'date'],
-            'reject_reason' => [
-                Rule::requiredIf(fn() => $request->input('status') === 'rejected'),
-                'nullable',
-                'string',
-                'max:2000',
-            ],
-        ];
-    }
-
-    /**
-     * Keeps the three approval columns consistent with the status: only an
-     * approved log has an approver and a timestamp, only a rejected one a reason,
-     * and a log moved back to pending has neither.
-     *
-     * @param  array<string, mixed>  $validated
-     * @return array<string, mixed>
-     */
-    private function approvalAttributes(Request $request, array $validated): array
-    {
-        return match ($validated['status']) {
-            'approved' => [
-                // Blank means "me, now" — the common case when an admin approves inline.
-                'approved_by' => $validated['approved_by'] ?? $request->user()->id,
-                'approved_at' => $validated['approved_at'] ?? now(),
-                'reject_reason' => null,
-            ],
-            'rejected' => [
-                'approved_by' => null,
-                'approved_at' => null,
-                'reject_reason' => $validated['reject_reason'],
-            ],
-            default => ['approved_by' => null, 'approved_at' => null, 'reject_reason' => null],
-        };
-    }
-
     private function month(string $value): CarbonImmutable
     {
         try {
@@ -287,30 +187,15 @@ class AttendanceLogController extends Controller
         }
     }
 
+    /**
+     * The Inertia pages and the JSON API share one serializer, so a field added
+     * for the API shows up on the pages too.
+     *
+     * @return array<string, mixed>
+     */
     private function logPayload(AttendanceLog $log): array
     {
-        return [
-            'id' => $log->id,
-            'employee_id' => $log->employee_id,
-            'employee' => $log->relationLoaded('employee') ? [
-                'employee_no' => $log->employee->employee_no,
-                'full_name' => $log->employee->full_name,
-                'company' => $log->employee->company?->name,
-            ] : null,
-            'date' => $log->date->format('Y-m-d'),
-            'time_in' => $log->log_in_time ? substr($log->log_in_time, 0, 5) : null,
-            'time_out' => $log->log_out_time ? substr($log->log_out_time, 0, 5) : null,
-            'notes' => $log->notes,
-            'status' => strtolower($log->status),
-            'duration' => $log->duration,
-            'duration_minutes' => $log->duration_minutes,
-            'approved_by' => $log->approved_by,
-            'approved_by_name' => $log->approver?->name,
-            // Two shapes: one the datetime-local input accepts, one for the table.
-            'approved_at' => $log->approved_at?->format('Y-m-d\TH:i'),
-            'approved_at_label' => $log->approved_at?->format('M j, Y g:i A'),
-            'reject_reason' => $log->reject_reason,
-        ];
+        return TimeLogResource::make($log)->resolve();
     }
 
     private function assertManager(Request $request): void
@@ -324,11 +209,6 @@ class AttendanceLogController extends Controller
         abort_unless($request->user()->employee, 422, 'Your account is not linked to an employee record.');
 
         return $request->user()->employee;
-    }
-
-    private function employeeInScope(Request $request, int $id): Employee
-    {
-        return Employee::query()->visibleTo($request->user())->findOrFail($id);
     }
 
     private function assertLogInScope(Request $request, AttendanceLog $log): void
