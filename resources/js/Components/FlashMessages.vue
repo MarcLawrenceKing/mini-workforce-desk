@@ -1,20 +1,37 @@
 <script setup>
-import { computed } from "vue";
+import { watch } from "vue";
 import { usePage } from "@inertiajs/vue3";
-import Message from "primevue/message";
+import Toast from "primevue/toast";
+import { useToast } from "primevue/usetoast";
 
 const page = usePage();
+const toast = useToast();
 
-const flash = computed(() => page.props.flash ?? {});
+watch(
+    () => page.props.flash,
+    (flash = {}) => {
+        if (flash.success) {
+            toast.add({
+                severity: "success",
+                summary: "Success",
+                detail: flash.success,
+                life: 4000,
+            });
+        }
+
+        if (flash.error) {
+            toast.add({
+                severity: "error",
+                summary: "Error",
+                detail: flash.error,
+                life: 6000,
+            });
+        }
+    },
+    { immediate: true, deep: true },
+);
 </script>
 
 <template>
-    <div v-if="flash.success || flash.error" class="stack">
-        <Message v-if="flash.success" severity="success" :closable="true">
-            {{ flash.success }}
-        </Message>
-        <Message v-if="flash.error" severity="error" :closable="true">
-            {{ flash.error }}
-        </Message>
-    </div>
+    <Toast position="top-right" />
 </template>

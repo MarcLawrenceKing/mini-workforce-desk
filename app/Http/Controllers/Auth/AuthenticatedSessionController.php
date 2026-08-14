@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\User;
+use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +14,8 @@ use Inertia\Response;
 
 class AuthenticatedSessionController extends Controller
 {
+    public function __construct(private readonly ActivityLogger $activityLogger) {}
+
     public function create(): Response
     {
         return Inertia::render('Auth/Login', [
@@ -28,11 +31,15 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        $this->activityLogger->log($request->user(), 'login', 'web session');
+
         return redirect()->intended(route('my-account'));
     }
 
     public function destroy(Request $request): RedirectResponse
     {
+        $this->activityLogger->log($request->user(), 'logout', 'web session');
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

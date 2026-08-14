@@ -23,6 +23,7 @@ watch(isMobile, (mobile) => {
 
 <template>
     <AppHeader :show-menu-toggle="isMobile" @toggle-menu="drawerOpen = true" />
+    <FlashMessages />
 
     <div class="app-body">
         <aside v-if="isLoggedIn" class="app-sidebar">
@@ -30,10 +31,6 @@ watch(isMobile, (mobile) => {
         </aside>
 
         <main class="app-main">
-            <div class="app-flash">
-                <FlashMessages />
-            </div>
-
             <slot />
         </main>
     </div>

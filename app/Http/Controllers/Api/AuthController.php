@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -22,6 +23,8 @@ use Illuminate\Validation\ValidationException;
  */
 class AuthController extends Controller
 {
+    public function __construct(private readonly ActivityLogger $activityLogger) {}
+
     /**
      * Exchange credentials for a personal access token.
      *
@@ -56,9 +59,13 @@ class AuthController extends Controller
 
         RateLimiter::clear($this->throttleKey($request));
 
+        $token = $user->createToken($credentials['device_name'])->plainTextToken;
+
+        $this->activityLogger->log($user, 'login', 'API token: '.$credentials['device_name']);
+
         return response()->json([
             // Shown exactly once — only a hash is stored. Lose it and you mint a new one.
-            'token' => $user->createToken($credentials['device_name'])->plainTextToken,
+            'token' => $token,
             'user' => $this->profile($user),
         ]);
     }
@@ -75,6 +82,10 @@ class AuthController extends Controller
      */
     public function logout(Request $request): Response
     {
+        $tokenName = $request->user()->currentAccessToken()?->name ?? 'session';
+
+        $this->activityLogger->log($request->user(), 'logout', 'API token: '.$tokenName);
+
         $request->user()->currentAccessToken()?->delete();
 
         return response()->noContent();
@@ -113,6 +124,6 @@ class AuthController extends Controller
 
     private function throttleKey(Request $request): string
     {
-        return 'api-login|' . Str::transliterate(Str::lower($request->string('email')) . '|' . $request->ip());
+        return 'api-login|'.Str::transliterate(Str::lower($request->string('email')).'|'.$request->ip());
     }
 }

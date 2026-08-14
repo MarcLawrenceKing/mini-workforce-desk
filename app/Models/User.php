@@ -3,20 +3,21 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Observers\DashboardCacheObserver;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laratrust\Contracts\LaratrustUser;
 use Laratrust\Traits\HasRolesAndPermissions;
 use Laravel\Sanctum\HasApiTokens;
-use App\Observers\DashboardCacheObserver;
-use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 
 #[Fillable(['company_id', 'name', 'email', 'username', 'password', 'is_disabled'])]
 #[Hidden(['password', 'remember_token'])]
@@ -53,6 +54,11 @@ class User extends Authenticatable implements LaratrustUser
         return $this->hasOne(Employee::class);
     }
 
+    public function activityLogs(): HasMany
+    {
+        return $this->hasMany(ActivityLog::class);
+    }
+
     /**
      * Whether the platform has been bootstrapped. Registration is open only
      * while this is false — see EnsureNoAdminExists.
@@ -60,7 +66,7 @@ class User extends Authenticatable implements LaratrustUser
     public static function adminExists(): bool
     {
         return static::query()
-            ->whereHas('roles', fn(Builder $query) => $query->where('name', 'admin'))
+            ->whereHas('roles', fn (Builder $query) => $query->where('name', 'admin'))
             ->exists();
     }
 
@@ -72,7 +78,7 @@ class User extends Authenticatable implements LaratrustUser
     {
         return $query->when(
             ! $viewer->hasRole('admin'),
-            fn(Builder $q) => $q->where('company_id', $viewer->company_id),
+            fn (Builder $q) => $q->where('company_id', $viewer->company_id),
         );
     }
 }

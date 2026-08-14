@@ -2,9 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Laratrust\Models\Permission as PermissionModel;
 
-class Permission extends PermissionModel
-{
-    public $guarded = [];
-}
+#[Fillable(['name', 'display_name', 'description'])]
+class Permission extends PermissionModel {}

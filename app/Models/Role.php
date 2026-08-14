@@ -2,9 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Laratrust\Models\Role as RoleModel;
 
-class Role extends RoleModel
-{
-    public $guarded = [];
-}
+#[Fillable(['name', 'display_name', 'description'])]
+class Role extends RoleModel {}

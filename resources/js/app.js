@@ -6,6 +6,7 @@ import AppLayout from "./Layouts/AppLayout.vue";
 import AuthLayout from "./Layouts/AuthLayout.vue";
 import PrimeVue from "primevue/config";
 import ConfirmationService from "primevue/confirmationservice";
+import ToastService from "primevue/toastservice";
 import Tooltip from "primevue/tooltip";
 import Aura from "@primeuix/themes/aura";
 import "primeicons/primeicons.css";
@@ -40,6 +41,7 @@ createInertiaApp({
                     },
                 },
             })
+            .use(ToastService)
             .use(ConfirmationService)
             .directive("tooltip", Tooltip)
             .mount(el);
