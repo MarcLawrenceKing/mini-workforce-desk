@@ -9,8 +9,14 @@ import { useForm } from "@inertiajs/vue3";
  * @param {string}   config.resource  URL segment, e.g. "employees"
  * @param {object}   config.defaults  Blank form values (also the create state)
  * @param {Function} config.fill      Row -> form values, for edit mode
+ * @param {boolean}  config.multipart Use FormData and PUT method spoofing
  */
-export function useCrudDialog({ resource, defaults, fill = (row) => row }) {
+export function useCrudDialog({
+    resource,
+    defaults,
+    fill = (row) => row,
+    multipart = false,
+}) {
     const visible = ref(false);
     const record = ref(null);
     const form = useForm({ ...defaults });
@@ -38,10 +44,21 @@ export function useCrudDialog({ resource, defaults, fill = (row) => row }) {
             },
         };
 
-        if (isEdit.value) {
+        if (isEdit.value && multipart) {
+            // PHP does not reliably populate multipart bodies sent as PUT.
+            // Method spoofing keeps the Laravel PUT route while sending POST.
+            form.transform((data) => ({ ...data, _method: "put" })).post(
+                `/${resource}/${record.value.id}`,
+                { ...options, forceFormData: true },
+            );
+        } else if (isEdit.value) {
+            form.transform((data) => data);
             form.put(`/${resource}/${record.value.id}`, options);
         } else {
-            form.post(`/${resource}`, options);
+            form.transform((data) => data).post(`/${resource}`, {
+                ...options,
+                forceFormData: multipart,
+            });
         }
     }
 

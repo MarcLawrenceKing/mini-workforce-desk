@@ -2,15 +2,16 @@
 
 namespace App\Models;
 
+use App\Observers\DashboardCacheObserver;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Observers\DashboardCacheObserver;
-use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Support\Facades\Storage;
 
 #[Fillable([
     'user_id',
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Attributes\ObservedBy;
     'first_name',
     'middle_name',
     'last_name',
+    'photo_url',
 ])]
 #[ObservedBy(DashboardCacheObserver::class)]
 
@@ -37,6 +39,14 @@ class Employee extends Model
                 $this->middle_name,
                 $this->last_name,
             ]))),
+        );
+    }
+
+    /** Convert the stored disk path into the URL served through public/storage. */
+    protected function photoUrl(): Attribute
+    {
+        return Attribute::get(
+            fn (?string $path) => $path ? Storage::disk('public')->url($path) : null,
         );
     }
 

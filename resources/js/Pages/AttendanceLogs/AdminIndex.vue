@@ -47,6 +47,10 @@ const month = ref(props.month);
 const { loading, errors, message, call, clear } = useApi();
 const busyId = ref(null);
 
+function exportCsv() {
+    window.location.href = `/api/time-logs/export?month=${encodeURIComponent(month.value)}`;
+}
+
 watch(() => props.logs, (logs) => { rows.value = [...logs]; });
 watch(() => props.month, (value) => { month.value = value; });
 
@@ -189,7 +193,10 @@ const severity = (status) => ({ approved: "success", rejected: "danger", pending
     <div class="page">
         <div class="page-header">
             <div><h1 class="page-title">Attendance Logs</h1><p class="app-hint">Attendance records for employees in your company.</p></div>
-            <Button label="Add attendance" icon="pi pi-plus" @click="open()" />
+            <div class="row-actions">
+                <Button label="Export CSV" icon="pi pi-download" severity="secondary" outlined @click="exportCsv" />
+                <Button label="Add attendance" icon="pi pi-plus" @click="open()" />
+            </div>
         </div>
 
         <!-- Whatever the API refused: 403 no permission, 404 gone, 422 rule broken. -->

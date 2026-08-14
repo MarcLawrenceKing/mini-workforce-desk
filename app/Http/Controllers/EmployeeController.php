@@ -7,6 +7,8 @@ use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -30,7 +32,7 @@ class EmployeeController extends Controller
                 ->map(fn (Employee $employee) => [
                     ...$employee->only([
                         'id', 'employee_no', 'full_name', 'company_id', 'user_id',
-                        'first_name', 'middle_name', 'last_name',
+                        'first_name', 'middle_name', 'last_name', 'photo_url',
                     ]),
                     'company' => $employee->company?->only(['id', 'name']),
                     'user' => $employee->user?->only(['id', 'name', 'email']),
@@ -80,11 +82,15 @@ class EmployeeController extends Controller
             'middle_name' => ['required', 'string', 'max:255'],   // NOT NULL in the migration
             'last_name' => ['required', 'string', 'max:255'],
             'user_id' => ['nullable', 'integer', 'exists:users,id', 'unique:employees,user_id'],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
+        $photoPath = $request->file('photo')?->store('employee-photos', 'public');
+
         Employee::create([
-            ...$validated,
+            ...Arr::except($validated, ['photo']),
             'company_id' => $companyId,
+            'photo_url' => $photoPath,
         ]);
 
         return back()->with('success', 'Employee created.');
@@ -108,9 +114,20 @@ class EmployeeController extends Controller
                 'nullable', 'integer', 'exists:users,id',
                 Rule::unique('employees', 'user_id')->ignore($employee->id),
             ],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
 
-        $employee->update($validated);
+        $oldPhotoPath = $employee->getRawOriginal('photo_url');
+        $newPhotoPath = $request->file('photo')?->store('employee-photos', 'public');
+
+        $employee->update([
+            ...Arr::except($validated, ['photo']),
+            ...($newPhotoPath ? ['photo_url' => $newPhotoPath] : []),
+        ]);
+
+        if ($newPhotoPath && $oldPhotoPath) {
+            Storage::disk('public')->delete($oldPhotoPath);
+        }
 
         return back()->with('success', 'Employee updated.');
     }

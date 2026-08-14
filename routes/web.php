@@ -7,6 +7,7 @@ use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\MyAccountController;
+use App\Http\Controllers\TimeLogExportController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -124,6 +125,9 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::prefix('attendance-logs')->name('attendance-logs.')
         ->middleware(['role:company_admin|employee', 'permission:attendance-logs.view'])->group(function () {
             Route::get('/', [AttendanceLogController::class, 'index'])->name('index');
+            Route::get('/export', TimeLogExportController::class)
+                ->middleware('role:company_admin')
+                ->name('export');
             Route::post('/', [AttendanceLogController::class, 'store'])->name('store');
             Route::post('/check-in', [AttendanceLogController::class, 'checkIn'])->name('check-in');
             Route::put('/check-out', [AttendanceLogController::class, 'checkOut'])->name('check-out');

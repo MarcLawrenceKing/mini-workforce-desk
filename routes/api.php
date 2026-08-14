@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\TimeLogController;
+use App\Http\Controllers\TimeLogExportController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -37,6 +38,10 @@ Route::name('api.')->group(function () {
         // Same gate as the web UI: company_admin and employee hold
         // attendance-logs.view; admin does not, and gets a 403 here too.
         Route::middleware('permission:attendance-logs.view')->group(function () {
+            Route::get('/time-logs/export', TimeLogExportController::class)
+                ->middleware('role:company_admin')
+                ->name('time-logs.export');
+
             Route::apiResource('time-logs', TimeLogController::class)
                 ->parameters(['time-logs' => 'timeLog']);
 

@@ -56,6 +56,7 @@ const {
         middle_name: "",
         last_name: "",
         user_id: null,
+        photo: null,
     },
     fill: (employee) => ({
         company_id: employee.company_id,
@@ -64,8 +65,27 @@ const {
         middle_name: employee.middle_name,
         last_name: employee.last_name,
         user_id: employee.user_id,
+        photo: null,
     }),
+    multipart: true,
 });
+
+const photoPreview = ref(null);
+
+watch(
+    [() => form.photo, record],
+    ([photo, employee], _, onCleanup) => {
+        if (typeof File !== "undefined" && photo instanceof File) {
+            const objectUrl = URL.createObjectURL(photo);
+            photoPreview.value = objectUrl;
+            onCleanup(() => URL.revokeObjectURL(objectUrl));
+            return;
+        }
+
+        photoPreview.value = employee?.photo_url ?? null;
+    },
+    { immediate: true },
+);
 
 /**
  * Only unlinked accounts are offered. The row's own account isn't in that list
@@ -107,6 +127,14 @@ const fields = computed(() => [
     { name: "first_name", label: "First name", type: "text" },
     { name: "middle_name", label: "Middle name", type: "text" },
     { name: "last_name", label: "Last name", type: "text" },
+    {
+        name: "photo",
+        label: "Profile photo",
+        type: "file",
+        accept: "image/jpeg,image/png,image/webp",
+        preview: photoPreview.value,
+        help: "JPG, PNG or WebP, up to 2 MB. Leave blank while editing to keep the current photo.",
+    },
     {
         name: "user_id",
         label: "Linked account",
@@ -212,6 +240,17 @@ function restore(employee) {
                         </div>
                     </template>
 
+                    <Column header="Photo" style="width: 5rem">
+                        <template #body="{ data }">
+                            <img
+                                v-if="data.photo_url"
+                                :src="data.photo_url"
+                                :alt="`${data.full_name}'s profile`"
+                                class="h-10 w-10 rounded-full object-cover"
+                            />
+                            <i v-else class="pi pi-user app-muted" />
+                        </template>
+                    </Column>
                     <Column field="employee_no" header="Employee no." sortable />
                     <Column field="full_name" header="Name" sortable />
                     <Column field="company.name" header="Company" sortable>

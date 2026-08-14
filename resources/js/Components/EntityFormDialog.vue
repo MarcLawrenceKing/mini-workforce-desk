@@ -133,6 +133,23 @@ function close() {
                         fluid
                     />
 
+                    <div v-else-if="field.type === 'file'" class="stack">
+                        <img
+                            v-if="field.preview"
+                            :src="field.preview"
+                            :alt="`${field.label} preview`"
+                            class="h-24 w-24 rounded-full object-cover"
+                        />
+                        <input
+                            :id="field.name"
+                            type="file"
+                            :accept="field.accept"
+                            :aria-invalid="!!form.errors[field.name]"
+                            @click="$event.target.value = null"
+                            @change="form[field.name] = $event.target.files?.[0] ?? null"
+                        />
+                    </div>
+
                     <InputText
                         v-else
                         :id="field.name"
